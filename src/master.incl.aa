@@ -1,0 +1,81 @@
+
+$module [ dotP_0 ] $in (R: $uint<8>) $out (result: $uint<32>) $is
+{
+	$branchblock[mmloop] {
+		$dopipeline $depth 15 $fullrate
+			$merge $entry $loopback 
+				$phi C := ($bitcast ($uint<8>) 0) $on $entry nC $on $loopback
+				$phi Index :=($bitcast ($uint<3>) 0) $on $entry nIndex $on $loopback
+				$phi val_0 := ($bitcast ($uint<32>) 0) $on $entry nval_0 $on $loopback
+                $phi val_1 := ($bitcast ($uint<32>) 0) $on $entry nval_1 $on $loopback
+				$phi val_2 := ($bitcast ($uint<32>) 0) $on $entry nval_2 $on $loopback
+				$phi val_3 := ($bitcast ($uint<32>) 0) $on $entry nval_3 $on $loopback
+			$endmerge
+
+			a_rc_0 := A_MEM[R][Index]
+            a_rc_1 := B_MEM[R][Index]
+			a_rc_2 := C_MEM[R][Index]
+			a_rc_3 := D_MEM[R][Index]
+			$rreport (dotP matrixA_read a_rc_0 a_rc_1 a_rc_2 a_rc_3 Index)
+
+            xval_0 := x0[Index]
+            xval_1 := x1[Index]
+            xval_2 := x2[Index]
+            xval_3 := x3[Index]
+			$rreport (dotP vectorX_read xval_0 xval_1 xval_2 xval_3 Index)
+
+			$volatile nval_0 := (val_0 + (a_rc_0 * xval_0))
+            $volatile nval_1 := (val_1 + (a_rc_1 * xval_1))
+            $volatile nval_2 := (val_2 + (a_rc_2 * xval_2))
+            $volatile nval_3 := (val_3 + (a_rc_3 * xval_3))
+            $rreport (dotP multiplication nval_0 nval_1 nval_2 nval_3)
+			nC := (C + 4)
+			nIndex := (Index + 1)
+		$while (nC < MATRIX_ORDER)
+	} (nval_0 => nval_0 nval_1 => nval_1 nval_2 => nval_2 nval_3 => nval_3) 
+
+	result := (nval_0 +(nval_1 + (nval_2 + nval_3)))
+}
+
+
+
+
+$module [ dotP_1 ] $in (R: $uint<8>) $out (result: $uint<32>) $is
+{
+	$branchblock[mmloop] {
+		$dopipeline $depth 15 $fullrate
+			$merge $entry $loopback 
+				$phi C := ($bitcast ($uint<8>) 0) $on $entry nC $on $loopback
+				$phi Index :=($bitcast ($uint<3>) 0) $on $entry nIndex $on $loopback
+				$phi val_0 := ($bitcast ($uint<32>) 0) $on $entry nval_0 $on $loopback
+                $phi val_1 := ($bitcast ($uint<32>) 0) $on $entry nval_1 $on $loopback
+				$phi val_2 := ($bitcast ($uint<32>) 0) $on $entry nval_2 $on $loopback
+				$phi val_3 := ($bitcast ($uint<32>) 0) $on $entry nval_3 $on $loopback
+			$endmerge
+
+			a_rc_0 := A_MEM[R][Index]
+            a_rc_1 := B_MEM[R][Index]
+			a_rc_2 := C_MEM[R][Index]
+			a_rc_3 := D_MEM[R][Index]
+			$rreport (dotP matrixA_read a_rc_0 a_rc_1 a_rc_2 a_rc_3 Index)
+
+            xval_0 := x0[Index]
+            xval_1 := x1[Index]
+            xval_2 := x2[Index]
+            xval_3 := x3[Index]
+			$rreport (dotP vectorX_read xval_0 xval_1 xval_2 xval_3 Index)
+
+			$volatile nval_0 := (val_0 + (a_rc_0 * xval_0))
+            $volatile nval_1 := (val_1 + (a_rc_1 * xval_1))
+            $volatile nval_2 := (val_2 + (a_rc_2 * xval_2))
+            $volatile nval_3 := (val_3 + (a_rc_3 * xval_3))
+            $rreport (dotP multiplication nval_0 nval_1 nval_2 nval_3)
+			nC := (C + 4)
+			nIndex := (Index + 1)
+		$while (nC < MATRIX_ORDER)
+	} (nval_0 => nval_0 nval_1 => nval_1 nval_2 => nval_2 nval_3 => nval_3) 
+
+	result := (nval_0 +(nval_1 + (nval_2 + nval_3)))
+}
+
+

@@ -1,0 +1,11 @@
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <Pipes.h>
+#include <SocketLib.h>
+void global_storage_initializer_();
+void mem_init();
+void mvp_daemon();
+void mvp_unit();
+void readMatrix();

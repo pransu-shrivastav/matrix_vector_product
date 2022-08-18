@@ -1,0 +1,5 @@
+#define DOTP dotP_0
+#include utils.aa
+
+#define DOTP dotP_1
+#include utils.aa

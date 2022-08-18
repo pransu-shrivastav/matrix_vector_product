@@ -1,0 +1,157 @@
+// matrix order.
+$parameter MATRIX_ORDER 	32
+$constant ZERO_2: $uint<2> := 0
+$constant ONE_2: $uint<2> := 1
+$constant TWO_2: $uint<2> := 2
+$constant THREE_2: $uint<2> := 3
+
+
+// storage for the matrix A
+$storage A_MEM: $array [MATRIX_ORDER][{MATRIX_ORDER/4}] $of $uint<32>
+$storage B_MEM: $array [MATRIX_ORDER][{MATRIX_ORDER/4}] $of $uint<32>
+$storage C_MEM: $array [MATRIX_ORDER][{MATRIX_ORDER/4}] $of $uint<32>
+$storage D_MEM: $array [MATRIX_ORDER][{MATRIX_ORDER/4}] $of $uint<32>
+
+// storage for input vector x
+$storage x0: $array [{MATRIX_ORDER/4}] $of $uint<32>
+$storage x1: $array [{MATRIX_ORDER/4}] $of $uint<32>
+$storage x2: $array [{MATRIX_ORDER/4}] $of $uint<32>
+$storage x3: $array [{MATRIX_ORDER/4}] $of $uint<32>
+
+// in-data pipe
+$pipe in_data: $uint<32> $depth 3
+
+// out-data pipe
+$pipe out_data: $uint<32> $depth 3
+
+// helper module for reading the matrix and
+// populating the A_MEM array.
+$module [readMatrix] $in () $out () $is
+{
+	$branchblock[mRead] {
+
+			$merge $entry outer_loopback
+				$phi I := ($bitcast ($uint<8>) 0) $on $entry nI $on outer_loopback
+				$endmerge
+			nI := (I + 1)
+			$merge $entry inner_loopback
+				$phi J := ($bitcast ($uint<8>) 0) $on $entry nJ $on inner_loopback
+			$endmerge
+			nJ := (J + 1)
+			aval := in_data
+            $volatile Digit := ($slice J 1 0)
+			$rreport(readMatrix loop_no I J aval)
+            Index :=($slice J 7 2)
+			$volatile aTrue := (Digit == ZERO_2)
+			$volatile bTrue := (Digit == ONE_2)
+			$volatile cTrue := (Digit == TWO_2)
+			$volatile dTrue := (Digit == THREE_2)
+            $guard(aTrue)
+			    A_MEM[I][Index] := aval
+			$guard(aTrue)
+				$rreport(readMatrix mem_A aval I J Index )
+			
+			$guard(bTrue)
+			    B_MEM[I][Index] := aval
+			$guard(bTrue)
+				$rreport(readMatrix mem_B aval I J Index )
+
+			$guard(cTrue)
+			    C_MEM[I][Index] := aval
+			$guard(cTrue)
+				$rreport(readMatrix mem_C aval I J Index )
+		
+			$guard(dTrue)
+			    D_MEM[I][Index] := aval
+			$guard(dTrue)
+				$rreport(readMatrix mem_D aval I J Index )
+		
+	        $if (nJ < MATRIX_ORDER) $then
+				$place [inner_loopback]
+			$endif
+
+		$if (nI < MATRIX_ORDER) $then
+				$place [outer_loopback]
+		$endif
+	}
+}
+
+// helper module which reads the vector x.
+$module [readVector] $in () $out () $is
+{
+	$branchblock [loop] {
+		$dopipeline $depth 7 $fullrate
+			$merge $entry $loopback
+				$phi I := ($bitcast ($uint<8>) 0) $on $entry nI $on $loopback
+			$endmerge 
+			aval := in_data
+            i_val := ($slice I 1 0)
+			Index := ($slice I 7 2)
+			$rreport(readVector loop_no I i_val aval)
+			
+            $volatile aTrue := (i_val == ZERO_2)
+			$volatile bTrue := (i_val == ONE_2) 
+			$volatile cTrue := (i_val == TWO_2)
+			$volatile dTrue := (i_val == THREE_2)
+
+            $guard (aTrue)
+			    x0[Index]:= aval
+			$guard (aTrue)
+				$rreport(readVector x0 aval i_val I  Index)
+			$guard (bTrue)
+			    x1[Index] := aval
+			$guard (bTrue)
+				$rreport(readVector x1 aval i_val I Index)
+			$guard (cTrue)
+			    x2[Index] := aval
+			$guard (cTrue)
+				$rreport(readVector x2 aval i_val I Index)
+			$guard (dTrue)
+			    x3[Index] := aval
+			$guard (dTrue)
+				$rreport(readVector x3 aval i_val I Index)			
+			$volatile nI := (I + 1)
+		$while (nI < MATRIX_ORDER)
+	}
+}
+// main module which performs A.x = y.
+// assumes that A, x are available.
+$module [multiplyMatrixVector] $in () $out () $is
+{
+	// dot product loop
+	$branchblock[mmloop] {
+		$merge $entry loopback 
+			$phi R := ($bitcast ($uint<8>) 0) $on $entry nR $on loopback
+		$endmerge
+
+			$call dotP_0 (R) (val_0)
+			$call dotP_1 ((R+1)) (val_1)
+            out_data := val_0
+			out_data := val_1
+			$rreport(multiplyMatrixVector product_value R val_0 val_1 )
+			nR := (R + 2)
+		$if (nR < MATRIX_ORDER) $then
+			$place [loopback]
+		$endif
+
+	}
+}
+
+
+//
+// main thread: reads the matrix, and
+// works on vectors..
+//
+$module [mvp_daemon] $in () $out () $is
+{
+	// read the matrix.
+	$call readMatrix () ()
+	$rreport(mvp_daemon done_readingA)
+	$branchblock [loop] {
+		$merge $entry loopback $endmerge
+		$call readVector () ()
+		$rreport(mvp_daemon done_readingX)
+		$call multiplyMatrixVector () ()
+		$place [loopback]
+	}
+}

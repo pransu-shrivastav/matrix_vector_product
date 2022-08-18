@@ -1,0 +1,48 @@
+An implementation of the matrix-vector product unit
+for 32x32 matrices.
+
+The implementation is described in the src/mvp.aa
+file.  It has a toplevel daemon which reads the
+input matrix, and then works on input vectors
+to produce product vectors.  
+
+The contents of this directory are as follows:
+
+src/
+	mvp.aa
+	
+testbench/
+	testbench.c
+		a simple test bench which sends
+		a specific matrix and specific
+		vectors to the hardware using
+		a sender thread, and uses a second
+		receiver thread to read back the
+		product vectors and confirm that
+		they are as expected.
+
+Compile scripts
+	compile.sh	 
+			Aa to VHDL
+
+	build_aa2c_tb.sh 
+			compile script for testing AA2C model.
+
+	build_ghdl_model.sh
+			compile script for GHDL simulation model.
+
+	build_ghdl_tb.sh
+			compile script for testbench to test
+			GHDL simulation model.
+
+	build.sh
+			run all the scripts in sequence.
+
+
+	clean.sh
+			a clean script.
+
+Intermediate result directories
+
+	bin/, vhdl/, aa2c/, .Aa/, .vC/
+

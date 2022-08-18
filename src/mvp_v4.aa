@@ -1,0 +1,129 @@
+// matrix order.
+$parameter MATRIX_ORDER 32
+$parameter LOOP_ORDER 8
+// storage for the matrix A
+$storage A_MEM: $array [MATRIX_ORDER][MATRIX_ORDER] $of $uint<32>
+
+$storage PPSM: $array [MATRIX_ORDER] $of $uint<32>
+
+// in-data pipe
+$pipe in_data: $uint<32> $depth 2
+
+// out-data pipe
+$pipe out_data: $uint<32> $depth 2
+// products_pipe pipe
+$pipe products_pipe: $uint<32> $depth 32
+
+// helper module for reading the matrix and
+// populating the A array.
+$module [readMatrix] $in () $out () $is
+{
+	$branchblock[mRead] {
+
+			$merge $entry outer_loopback
+				$phi I := ($bitcast ($uint<8>) 0) $on $entry nI $on outer_loopback
+				$endmerge
+			nI := (I + 1)
+			$branchblock [cRead]
+			{
+			$dopipeline $depth 8 $fullrate
+			$merge $entry $loopback
+				$phi J := ($bitcast ($uint<8>) 0) $on $entry nJ $on $loopback
+			$endmerge
+			nJ := (J + 1)
+			aval := in_data
+			A_MEM[I][J] := aval
+			$while(nJ<MATRIX_ORDER)
+           
+			}
+		$if (nI < MATRIX_ORDER) $then
+				$place [outer_loopback]
+		$endif
+	}
+}
+
+$module [mem_init] $in () $out () $is
+{
+$branchblock [initloop] {
+		$dopipeline $depth 8 $fullrate
+			$merge $entry $loopback
+				$phi J := ($bitcast ($uint<8>) 0) $on $entry nJ $on $loopback
+			$endmerge 
+			products_pipe := 0
+			$rreport (mvp_unit initialising_memory J)
+			nJ := (J + 1)
+		$while (nJ < MATRIX_ORDER)
+	}
+}
+$module [mvp_daemon] $in () $out () $is
+{
+	// read the matrix.
+	$parallelblock[parinitrea]
+	{
+		$call readMatrix () ()
+		$call mem_init () ()
+	}
+	$branchblock [loop]
+	{
+		$merge $entry loopback $endmerge
+		$rreport(mvp_daemon branchblock_execution)
+		$call mvp_unit () ()
+		$place [loopback]
+	}
+}
+$module [mvp_unit] $in() $out() $is
+{
+	$branchblock[fetchloop]
+	{
+		$merge $entry loopback_outer
+				$phi C := ($bitcast($uint<8>) 0) $on $entry NC $on loopback_outer
+				$phi x := in_data $on $entry in_data $on loopback_outer
+		$endmerge
+		$branchblock[productloop] 
+		{
+			$dopipeline $depth 8 $fullrate			
+			$merge $entry $loopback
+				$phi R := ($bitcast($uint<8>) 0) $on $entry NR $on $loopback
+			$endmerge
+			NR := (R+4)
+        	R1 := (R+1)
+            R2 := (R+2)
+            R3 := (R+3)
+			p  := A_MEM[R][C] 
+			pp := A_MEM[R1][C] 
+			ppp := A_MEM[R2][C]
+			pppp := A_MEM[R3][C]
+			mp0 := products_pipe
+			mp1 := products_pipe
+			mp2 := products_pipe
+			mp3 := products_pipe
+			$volatile pps0  :=(mp0 + (p*x))
+			$volatile pps1  :=(mp1 + (pp*x))
+			$volatile pps2  :=(mp2 + (ppp*x))
+			$volatile pps3  :=(mp3 + (pppp*x))
+			$rreport (mvp_unit mulitiplication x C R p pp ppp pppp mp0 mp1 mp2 mp3 pps0 pps1 pps2 pps3)
+			products_pipe  :=pps0
+			products_pipe :=pps1
+			products_pipe :=pps2
+			products_pipe :=pps3
+			$while (NR < MATRIX_ORDER)
+		}
+		NC:=(C+1)
+		$if(NC<MATRIX_ORDER) $then
+		 	$place [loopback_outer]
+		$endif	 
+	}
+	$branchblock [sendloop]
+	{
+		$dopipeline $depth 8 $fullrate
+			$merge $entry $loopback
+				$phi K := ($bitcast ($uint<8>) 0) $on $entry nK $on $loopback
+			$endmerge 
+			$rreport (mvp_unit sending_doutput K)
+			out_data := products_pipe
+			products_pipe:= 0
+			nK := (K + 1)
+		$while (nK < MATRIX_ORDER)
+	}
+}
+
